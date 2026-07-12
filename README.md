@@ -112,7 +112,7 @@ The lexicon deployed at scale, with its performance *measured* rather than assum
 
 | When | Milestone |
 |---|---|
-| **Jun 14, 2026** | Program start — glossary project begins: dictionary recovery + RAG pipeline |
+| **May 10, 2026** | Program start — glossary project begins: dictionary recovery + RAG pipeline |
 | **Jul 8, 2026** | OCR benchmark released: 4 VLMs, 276 pages, gemma4_31b selected; Markdown follow-up experiment |
 | **Jul 9, 2026** | Glossary finalized (extended edition) · keyword lexicon released (1,209 terms) · FineWeb2 filter + full LLM-as-judge evaluation (precision, recall, F1) shipped |
 | **Jul 10, 2026** | Full 46-book OCR corpus published (~6.8M characters) |
