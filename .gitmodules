@@ -1,0 +1,15 @@
+[submodule "arabic-cybersecurity-glossary"]
+	path = arabic-cybersecurity-glossary
+	url = ../arabic-cybersecurity-glossary
+[submodule "arabic-ocr-cybersecurity-benchmark"]
+	path = arabic-ocr-cybersecurity-benchmark
+	url = ../arabic-ocr-cybersecurity-benchmark
+[submodule "arabic-cybersecurity-ocr-corpus"]
+	path = arabic-cybersecurity-ocr-corpus
+	url = ../arabic-cybersecurity-ocr-corpus
+[submodule "arabic-cyber-keywords"]
+	path = arabic-cyber-keywords
+	url = ../arabic-cyber-keywords
+[submodule "arabic-cyber-filter"]
+	path = arabic-cyber-filter
+	url = ../arabic-cyber-filter
