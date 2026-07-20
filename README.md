@@ -15,7 +15,7 @@
 
 ## The mission
 
-Arabic is a low-resource language for cybersecurity NLP: there is no standardized Arabic security terminology, no large open Arabic cybersecurity corpus, and no established benchmark for OCR of Arabic technical documents. Over the program I built, end-to-end, the missing pieces — **a standards-grounded terminology, a high-precision keyword lexicon, a validated OCR pipeline, a 46-book full-text corpus, and a 13,345-document web corpus** — each project deliberately consuming the verified output of the one before it.
+Arabic is a low-resource language for cybersecurity NLP: there is no standardized Arabic security terminology, no large open Arabic cybersecurity corpus, and no established benchmark for OCR of Arabic technical documents. Over the program I built, end-to-end, the missing pieces — **a standards-grounded terminology, a high-precision keyword lexicon, a validated OCR pipeline, a 46-book full-text corpus, and a 14,653-document web corpus in which every single document was LLM-judged** — each project deliberately consuming the verified output of the one before it, and the final project feeding its measured evidence **back** into the lexicon as a tier system.
 
 The end state: **two complementary Arabic cybersecurity text corpora** (books + web) plus the reusable terminology and tooling that produced them, all intended as a foundation for training and evaluating Arabic language models in the cybersecurity domain.
 
@@ -26,8 +26,8 @@ The end state: **two complementary Arabic cybersecurity text corpora** (books + 
 | 1 | [arabic-cybersecurity-glossary](https://github.com/Alsumaitti/arabic-cybersecurity-glossary) | Standards-grounded EN→AR cybersecurity terminology via RAG over the Academy of the Arabic Language dictionary | **725-term** bilingual glossary, zero gaps |
 | 2 | [arabic-ocr-cybersecurity-benchmark](https://github.com/Alsumaitti/arabic-ocr-cybersecurity-benchmark) | Head-to-head evaluation of 4 vision-language OCR models on Arabic cybersecurity books | **276-page** benchmark; **gemma4_31b** selected |
 | 3 | [arabic-cybersecurity-ocr-corpus](https://github.com/Alsumaitti/arabic-cybersecurity-ocr-corpus) | Full-text OCR of 46 Arabic cybersecurity books using the benchmark winner | **5,434 pages / ~6.8M chars** in Markdown + JSON |
-| 4 | [arabic-cyber-keywords](https://github.com/Alsumaitti/arabic-cyber-keywords) | Precision-first Arabic cybersecurity keyword lexicon built from the glossary | **1,209 keywords** covering both translation styles |
-| 5 | [arabic-cyber-filter](https://github.com/Alsumaitti/arabic-cyber-filter) | Keyword filtering of 1M FineWeb2 records + LLM-as-judge evaluation | **13,345-document** explainable web corpus, measured P/R/F1 |
+| 4 | [arabic-cyber-keywords](https://github.com/Alsumaitti/arabic-cyber-keywords) | Precision-first Arabic cybersecurity keyword lexicon built from the glossary — now **evidence-tiered** from field data | **1,233 keywords** (both translation styles + mined English terms), tiered 1–4 by measured reliability |
+| 5 | [arabic-cyber-filter](https://github.com/Alsumaitti/arabic-cyber-filter) | Keyword filtering of 1M FineWeb2 records + LLM-as-judge evaluation, culminating in a **full-corpus census** | **14,653-document** web corpus, every record LLM-judged; tiered 2nd-gen filter (precision 0.39 → **0.64** at 68% retention) |
 
 ## How everything connects
 
@@ -39,8 +39,9 @@ flowchart TD
         ACAD["Academy of the Arabic Language<br/>Computing Dictionary (2012)<br/>~3,185 entries recovered from<br/>glyph-corrupted PDF"]
         G["<b>1 · arabic-cybersecurity-glossary</b><br/>RAG + style-grounded translation<br/>725-term EN→AR glossary"]
         K["<b>4 · arabic-cyber-keywords</b><br/>Precision-first curation +<br/>variant expansion<br/>1,209 Arabic keywords"]
-        F["<b>5 · arabic-cyber-filter</b><br/>SLURM-parallel filter of 1M<br/>FineWeb2 records + LLM-as-judge<br/>13,345-doc web corpus"]
+        F["<b>5 · arabic-cyber-filter</b><br/>SLURM-parallel filter of 1M<br/>FineWeb2 records + LLM-judged<br/>census of all 14,653 docs"]
         ACAD --> G --> K --> F
+        F -.->|"measured evidence flows back:<br/>24 mined keywords · tier system<br/>· deletion list"| K
     end
 
     subgraph D["📚 Documents track"]
@@ -62,6 +63,7 @@ The load-bearing links:
 - **Keywords → Filter.** The web-corpus filter does not invent its lexicon — it consumes the 1,209-keyword deliverable as-is, and its LLM-as-judge layer then *measures* how well that lexicon performs at corpus scale.
 - **Benchmark → OCR corpus.** The production OCR run doesn't guess a model; `gemma4_31b` was selected by a six-axis evaluation with significance testing, and the hardened OCR prompt was carried over from the benchmark's failure analysis.
 - **Cross-track validation.** The benchmark's 276-page ground truth doubled as the keyword list's validation set (44/46 books flagged, the 2 misses being a mojibake page and a nearly-all-English page) — the documents track quality-checking the terminology track.
+- **Filter → Keywords (the loop back).** The terminology track is a *cycle*, not a line: after the filter's LLM judge read every one of the 14,653 kept documents, the verdicts flowed back upstream into the keywords repo as **24 mined recall-gap terms, a 4-tier reliability rating for every observed keyword, and a 74-term measured deletion list** — the lexicon that fed the filter is now itself calibrated by the filter's output. Details in [the tiered-lexicon section below](#closing-the-loop-the-census-and-the-evidence-tiered-lexicon).
 
 ## What I did, project by project
 
@@ -98,6 +100,7 @@ Turning the glossary into a practical text classifier, designed so that **a sing
 - **Curated for precision:** every candidate sorted into *safe alone*, *only-in-disambiguating-combination* (`فيروس` is biology unless it's `فيروس حاسوبي`), or *rejected trap* (`التذكرة الذهبية` is a lottery, `تسلل` is a football offside) — each trap replaced by a safe combination.
 - **Expanded for recall:** automatic definite-article variants, hamza-less spelling variants (`إلكتروني`/`الكتروني`), and both translation registers, yielding **1,209 keywords**.
 - **Validated against the OCR ground truth** from the benchmark: 44/46 books flagged by at least one hit, and every firing keyword audited for plausible non-cyber Arabic readings.
+- **Now evidence-tiered (v2):** after the filter's full-corpus census (project 5), the repo also carries the field-measured artifacts — the combined **1,233-keyword** lexicon, per-keyword reliability **tiers 1–4**, the audit-trail TSV, and the measured deletion list. See [Closing the loop](#closing-the-loop-the-census-and-the-evidence-tiered-lexicon) below.
 
 ### 5 · The web corpus — [arabic-cyber-filter](https://github.com/Alsumaitti/arabic-cyber-filter)
 
@@ -106,7 +109,40 @@ The lexicon deployed at scale, with its performance *measured* rather than assum
 - Filtered a **1,000,000-record** sample of FineWeb2's Arabic subset down to a **13,345-document cybersecurity corpus** using whole-word Arabic matching (100-task SLURM array, ~1–2 min/task instead of hours sequentially).
 - **Explainable by design:** every kept record carries a `keywords_found` evidence column — the exact lexicon terms that justified keeping it — enabling human verification and cheap post-hoc re-filtering.
 - **LLM-as-judge evaluation layer:** a stratified 300-record sample judged for precision, TREC-style pooling over the 986,655 rejected records for recall. Headline findings: precision is driven almost entirely by distinct-keyword-hit count (lenient precision 0.58 at 1 hit → 1.00 at 6+), **estimated recall ≈ 0.79, F1 ≈ 0.73**, and the evidence trail doubles as a confidence score (`≥2 hits` lifts lenient precision to ~0.85 nearly for free).
-- Shipped a resumable Claude Message Batches API judge to extend the verdicts to the full corpus at half the standard API price.
+- **Then went beyond the sample:** expanded the lexicon with the mined recall-gap terms, re-filtered to a **14,653-record v2 corpus**, and judged **every single record** — a full census, run in-chat at zero API cost through a resumable 587-chunk campaign (a Batches-API judge was also shipped as the reproducible path). The census powers the tier system and the second-generation filter described next.
+
+## Closing the loop: the census and the evidence-tiered lexicon
+
+This is the program's final movement, and it turns the pipeline into a **cycle**: the lexicon built in project 4 was measured by project 5, and the measurements flowed back to upgrade the lexicon itself.
+
+**Where it came from.** The sample evaluation exposed two specific weaknesses, each with a methodical fix:
+
+1. **A recall gap that turned out to be English, not Arabic.** Mining the records the filter *missed* showed that cybersecurity vocabulary enters Arabic writing untranslated — an Arabic author writes "VPN", not `الشبكة الافتراضية الخاصة` (VPN alone appeared in 605 missed records; then `Antivirus`, `Proxy`, `Firewall`…). This was a scope gap of the Arabic-only glossary design, fixed by **24 mined-and-verified keywords** → a combined **1,233-keyword lexicon**, and a re-filtered **v2 corpus of 14,653 records**.
+2. **A precision gap: the filter trusted every keyword equally.** One hit of `الأمن السيبراني` almost certainly means a cyber document; one hit of `حصان طروادة` is usually a political metaphor. A blind "require 2 keywords" threshold throws away the good single-hit records along with the bad.
+
+**Why a census.** Tiering keywords by their *measured* reliability needs evidence per keyword — and a 300-record sample had only observed 286 of 1,209 keywords. So every one of the **14,653** v2 records was LLM-judged (`cyber` 3,131 / `borderline` 2,550 / `not_cyber` 8,972) in a resumable in-chat campaign — 587 chunks of 25 records, commit-and-push checkpoint per chunk so the subscription's ~5-hour usage window could never cost more than one chunk, ~20 sessions / ~14 h active over 5 days, **USD 0** instead of the ~USD 100 API budget originally proposed. Being a census, the resulting proportions are *exact*, not estimates.
+
+**What it produced — the tier system.** Crossing every verdict with each record's `keywords_found` evidence measures, per keyword, how much *co-occurring evidence* it needs before a match is trustworthy:
+
+| Tier | Meaning | Keywords |
+|---|---|---|
+| 1 | Self-sufficient — one hit alone is trustworthy | 136 |
+| 2 | Needs one companion keyword | 295 |
+| 3 | Needs two companions | 57 |
+| 4 | Only trustworthy inside 4+ hits | 152 |
+| — | Never appeared in a genuinely-cyber record → measured **deletion list** | 74 |
+
+The heart of it is the **demotion rule**: a keyword whose solo matches are mostly false positives is demoted no matter how often it "works" (`VPN`: 167 good solo records vs **414** not_cyber — not Tier 1). It also settled the keyword repo's long-standing "known edge cases" with data: `حصان طروادة` solo = 10 cyber vs **163** metaphors (demoted), while `ثغرة أمنية` held Tier 1 at 49 vs 36. Every assignment has a per-keyword audit trail, published back into [arabic-cyber-keywords](https://github.com/Alsumaitti/arabic-cyber-keywords).
+
+**How it improves the findings.** The tiers drive a **tiered acceptance rule** (keep a document iff ≥ 1 Tier-1 hit, or ≥ 2 hits of tier ≤ 2, or ≥ 3 of tier ≤ 3, or ≥ 4 tiered hits) — a second-generation filter measured exactly on the census:
+
+| Rule | Kept | Lenient precision | Retention of genuine docs | F1 |
+|---|---|---|---|---|
+| accept-all (v2 corpus as-is) | 14,653 | 0.388 | 1.000 | 0.559 |
+| blind `min ≥ 2` threshold | 4,846 | 0.625 | 0.534 | 0.576 |
+| **Tiered acceptance rule** | **6,041** | **0.636** | **0.677** | **0.656** |
+
+The tiered rule **strictly dominates the blind threshold on both precision and recall** — it keeps the genuinely good single-hit documents a flat threshold discards, while suppressing the metaphorical and product-page noise. Net effect: precision lifted 0.39 → **0.64** while retaining **68%** of everything genuine, with the best F1 of any rule — and every one of those numbers is *measured over the whole population*, not extrapolated. Full write-up: [arabic-cyber-filter/evaluation/RESULTS.md](https://github.com/Alsumaitti/arabic-cyber-filter/blob/main/evaluation/RESULTS.md) · campaign log: [CAMPAIGN.md](https://github.com/Alsumaitti/arabic-cyber-filter/blob/main/evaluation/chat_judging/CAMPAIGN.md).
 
 ## Timeline
 
@@ -117,6 +153,9 @@ The lexicon deployed at scale, with its performance *measured* rather than assum
 | **Jul 9, 2026** | Glossary finalized (extended edition) · keyword lexicon released (1,209 terms) · FineWeb2 filter + full LLM-as-judge evaluation (precision, recall, F1) shipped |
 | **Jul 10, 2026** | Full 46-book OCR corpus published (~6.8M characters) |
 | **Jul 12, 2026** | This hub repository — the connected picture |
+| **Jul 13, 2026** | Recall-gap mining: 24 new keywords (the English code-switching discovery) → **1,233-keyword lexicon** → re-filtered **v2 corpus (14,653 records)** |
+| **Jul 14–19, 2026** | **Full-corpus census**: all 14,653 records LLM-judged in-chat (587 resumable chunks, ~20 sessions, USD 0) |
+| **Jul 19, 2026** | Tier system rebuilt on full evidence · second-generation tiered filter measured (0.39 → 0.64 precision at 68% retention) · evidence published back into the keywords repo |
 
 ## The numbers, combined
 
@@ -124,20 +163,23 @@ The lexicon deployed at scale, with its performance *measured* rather than assum
 |---|---|
 | Dictionary entries recovered from corrupted PDF | ~3,185 (≈99.6% token validity) |
 | Bilingual glossary terms (zero gaps) | 725 |
-| Curated Arabic keywords | 1,209 |
+| Curated Arabic keywords | 1,209 → **1,233** after mining the filter's misses (24 English-code-switching terms) |
 | VLM OCR models benchmarked | 4 (on NVIDIA H200) |
 | Benchmark pages, six metric axes + IOC layer | 276 |
 | Books fully OCR'd | 46 (5,434 pages, ~6.8M characters, ~29.5 GPU-hours) |
 | Web records scanned | 1,000,000 |
-| Web corpus produced | 13,345 documents (~193 MB), every record with an evidence trail |
-| Measured filter quality (lenient) | precision ≈ 0.68 · recall ≈ 0.79 · F1 ≈ 0.73 |
-| LLM-judged sample records | 300 matched (stratified) + pooled recall sample over 986,655 rejects |
+| Web corpus produced | 13,345 documents (v1) → **14,653** (v2, expanded lexicon), every record with an evidence trail |
+| Measured filter quality — sample estimate (lenient) | precision ≈ 0.68 · recall ≈ 0.79 · F1 ≈ 0.73 |
+| LLM-judged records | 300-record stratified sample + pooled recall sample → then a **full census: 14,653 / 14,653** (100%, exact proportions) |
+| Evidence-tiered lexicon | **136 / 295 / 57 / 152** keywords in tiers 1–4 · 74-term measured deletion list · per-keyword audit trail |
+| Second-generation (tiered) filter, measured on the census | lenient precision **0.388 → 0.636** at **68%** retention of genuine docs (F1 0.656) — dominates a blind 2-keyword threshold on both axes |
+| Census cost | **USD 0** (resumable in-chat campaign) vs the ~USD 100 API budget originally proposed |
 
 ## Skills & infrastructure exercised
 
 - **HPC at every stage:** SLURM array jobs (100-task filtering arrays, one-GPU-per-book OCR arrays), resumable checkpointed pipelines, null-byte-safe path handling, and hard lessons about login-node limits and verifying remote file content after upload.
 - **Arabic NLP specifics:** whole-word matching with Unicode word boundaries, diacritic stripping, hamza spelling variants, definite-article morphology, classical vs. modern translation registers, RTL/LTR bidirectional text integrity.
-- **LLMs as engineering components:** RAG-grounded translation with style codification, VLMs as OCR engines with failure-mode-driven prompts, LLM-as-judge with structured rubrics, Wilson confidence intervals, and batch-API cost engineering.
+- **LLMs as engineering components:** RAG-grounded translation with style codification, VLMs as OCR engines with failure-mode-driven prompts, LLM-as-judge with structured rubrics, Wilson confidence intervals, batch-API cost engineering — and a **zero-cost full-corpus judging census** engineered around subscription usage windows (587 resumable chunks, validate-commit-push checkpoint each, so an interruption never costs more than one chunk).
 - **Research honesty:** every repo states its validity caveats openly — model-made ground truth, single-corpus generalization limits, sensitivity of the recall estimate — and every classification decision is auditable (provenance flags, evidence columns, challenge logs).
 
 ## Getting the code
