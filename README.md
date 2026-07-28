@@ -144,6 +144,8 @@ The heart of it is the **demotion rule**: a keyword whose solo matches are mostl
 
 The tiered rule **strictly dominates the blind threshold on both precision and recall** — it keeps the genuinely good single-hit documents a flat threshold discards, while suppressing the metaphorical and product-page noise. Net effect: precision lifted 0.39 → **0.64** while retaining **68%** of everything genuine, with the best F1 of any rule — and every one of those numbers is *measured over the whole population*, not extrapolated. Full write-up: [arabic-cyber-filter/evaluation/RESULTS.md](https://github.com/Alsumaitti/arabic-cyber-filter/blob/main/evaluation/RESULTS.md) · campaign log: [CAMPAIGN.md](https://github.com/Alsumaitti/arabic-cyber-filter/blob/main/evaluation/chat_judging/CAMPAIGN.md).
 
+**And it was shipped, not just measured.** The rule became a production filter and was re-run over the full **1M-record** FineWeb2 sample on the cluster (resumable 100-task `cpu-all` array), producing the final **6,041-document v3 corpus**. That run is the program's cleanest validation: reaching the answer by a completely different path — a fresh regex scan of 1M raw records rather than arithmetic over the census — it reproduced the predicted result **exactly, clause for clause** (3,253 / 2,780 / 6 / 2), and a text-hash join confirmed **zero records outside the judged census**. Because v3 is a strict subset of the judged corpus, it ships **with an LLM verdict on every record** (2,398 `cyber` · 1,446 `borderline` · 2,197 `not_cyber`) — a labelled corpus, not just a filtered one.
+
 ## Timeline
 
 | When | Milestone |
@@ -156,6 +158,7 @@ The tiered rule **strictly dominates the blind threshold on both precision and r
 | **Jul 13, 2026** | Recall-gap mining: 24 new keywords (the English code-switching discovery) → **1,233-keyword lexicon** → re-filtered **v2 corpus (14,653 records)** |
 | **Jul 14–19, 2026** | **Full-corpus census**: all 14,653 records LLM-judged in-chat (587 resumable chunks, ~20 sessions, USD 0) |
 | **Jul 19, 2026** | Tier system rebuilt on full evidence · second-generation tiered filter measured (0.39 → 0.64 precision at 68% retention) · evidence published back into the keywords repo |
+| **Jul 28, 2026** | v3 tiered filter re-run over the full 1M FineWeb2 sample on the cluster → final **6,041-document labelled corpus**, reproducing the census prediction exactly |
 
 ## The numbers, combined
 
@@ -168,7 +171,7 @@ The tiered rule **strictly dominates the blind threshold on both precision and r
 | Benchmark pages, six metric axes + IOC layer | 276 |
 | Books fully OCR'd | 46 (5,434 pages, ~6.8M characters, ~29.5 GPU-hours) |
 | Web records scanned | 1,000,000 |
-| Web corpus produced | 13,345 documents (v1) → **14,653** (v2, expanded lexicon), every record with an evidence trail |
+| Web corpus produced | 13,345 (v1) → **14,653** (v2, expanded lexicon) → **6,041** (v3, tiered rule) — every record with an evidence trail, and v3 additionally with an LLM verdict |
 | Measured filter quality — sample estimate (lenient) | precision ≈ 0.68 · recall ≈ 0.79 · F1 ≈ 0.73 |
 | LLM-judged records | 300-record stratified sample + pooled recall sample → then a **full census: 14,653 / 14,653** (100%, exact proportions) |
 | Evidence-tiered lexicon | **136 / 295 / 57 / 152** keywords in tiers 1–4 · 74-term measured deletion list · per-keyword audit trail |
