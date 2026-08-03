@@ -120,13 +120,23 @@ The biggest single body of work in the program, and the one that grew most since
 | **v2** | + 24 mined English terms (1,233 keywords), recall-driven | 14,653 | **0.388** *(full census — every record judged)* |
 | **v3** | Tiered acceptance rule at 1M scale | 6,041 | **0.636**, keeping 68% of genuine docs |
 | **v4** | Same rule over the **full crawl** — ~70M parquet rows, 112 GB | **370,019** | **0.715** [0.679–0.749] → **~264,600 genuine** |
-| **v5** | Per-record open-model judging of all of v4 *(in flight)* | ~276,000 proj. | ~0.887 proj., retaining ~92.5% of genuine content |
+| **v5** | Per-record open-model judging of **all** of v4 | **277,418** | **0.8902** [0.863–0.914], retaining 92.5% of genuine content |
+
+**📦 Published: [`Alsumaitti/arabic-cybersecurity-web`](https://huggingface.co/datasets/Alsumaitti/arabic-cybersecurity-web)** — ODC-By 1.0.
+
+```python
+from datasets import load_dataset
+ds = load_dataset("Alsumaitti/arabic-cybersecurity-web", split="train")   # 279,480 docs
+```
 
 - **A full-corpus census, not a sample.** Every one of the 14,653 v2 records was individually read and labelled `cyber` / `borderline` / `not_cyber` with a written justification — **587 chunks of 25 records**, judged one chunk at a time with a commit-and-push checkpoint after each, so hitting a rolling usage limit costs at most one chunk and resumes with zero rework. **~20 sessions, ~14 hours of active work over 5 days**, at **zero marginal API cost** — against a ~USD 85–120 API-budget proposal that the resumable in-chat approach made unnecessary. Result: `cyber` 21.4% · `borderline` 17.4% · `not_cyber` 61.2%, measured exactly, no confidence intervals needed.
 - **The census bought a better filter, and the improvement is measured.** The tiered acceptance rule (*keep a record iff ≥ 1 Tier-1 keyword, or ≥ 2 of tier ≤ 2, or ≥ 3 of tier ≤ 3, or ≥ 4 tiered keywords*) lifts lenient precision **0.39 → 0.64** while retaining **68%** of genuine records, and **strictly beats a blind `min ≥ 2` threshold on both precision and recall** (0.636 P / 0.677 retention vs 0.625 / 0.534) — because it trusts a lone `الأمن السيبراني` and distrusts a lone `VPN`.
 - **The production run validated the prediction exactly.** Re-running the rule over the full 1M-record sample on the cluster reproduced the offline census prediction **clause for clause — 6,041 records** — despite reaching it by a completely different code path, and a text-hash join confirmed **zero records outside the judged census**.
 - **Scaled 70×, and the rule got better, not worse.** v4 applied the same rule to the full FineWeb2 Arabic release (~70M rows across 25 parquet files, 112 GB), yielding **370,019 records at 0.715 precision** — higher than v3's 0.636 at 1M scale.
-- **Published as a Hugging Face dataset** with three configs: `corpus` (the bulk data), `census` (all 14,653 labelled documents with justifications, so anyone can recompute the numbers), and `judge_benchmark` (1,992 documents with a frontier gold label plus two open-model runs), alongside the tiered lexicon so the filter is reproducible rather than merely described.
+- **The census finished: all 370,019 documents judged individually** — 163 GPU-hours across 32 slices on two H200s, **0 unparsed, 0 duplicates**. v4's 0.7211 became **v5: 277,418 documents at 0.8902 precision**, with 25% removed. The interval reflects calibration uncertainty alone, because with every record judged there is no sampling error left.
+- **The cheap path was validated against ground truth.** A stratified sample of 1,585 documents — 0.4% of the judging cost — had predicted **0.7152** [0.6793–0.7492]; the full census came in at **0.7211**. Accurate to **0.6 percentage points**. Anyone who needs a corpus-precision number can stop at the sample.
+- **The strongest signal in the corpus turned out to be document length, and the filter did not use it.** Keep rate runs from **0.904** under 1k characters to **0.142** over 30k — the junk is *longer*, because long pages are forums, archives and aggregators that mention security in passing while a focused article is ~3k characters. A one-line `len(text) < 8000` cap gives **0.841** precision at **zero** LLM cost, beating the tier-rule tightening (0.816) on both axes; combined with judging it reaches **0.943**. A humbling result for weeks of keyword engineering, and the kind that only appears when you measure everything.
+- **Published as a Hugging Face dataset** ([`Alsumaitti/arabic-cybersecurity-web`](https://huggingface.co/datasets/Alsumaitti/arabic-cybersecurity-web)) with four configs: **`cyber_all`** (default — 279,480 documents judged security-related, both judges merged), `corpus` (v5 alone), `census` (all 14,653 labelled documents with justifications, so anyone can recompute the numbers), and `judge_benchmark` (1,992 documents with a frontier gold label plus two open-model runs), alongside the tiered lexicon so the filter is reproducible rather than merely described.
 
 #### The side-quest that became a result: can an open 31B model replace the frontier judge?
 
@@ -134,7 +144,7 @@ Frontier judging is what makes careful curation expensive, and that cost falls h
 
 **The answer is split, and the split is the interesting part.** For the **binary** accept/reject decision — the one the filter actually makes — the open model is a usable instrument: **Cohen κ 0.654**, 85.2% agreement, sensitivity 0.926, and across 664 truly-cyber documents it *never once* returned `not_cyber`. For **graded** relevance it fails, and **the failure is not fixable by prompting**: it cannot separate "about cybersecurity" from "mentions cybersecurity", and eleven worked exemplars aimed squarely at that weak class moved κ by **+0.003** and `borderline` recall by **exactly zero** — while changing 24.2% of the generated justifications, proving the exemplars were applied and simply did not help.
 
-What makes it usable anyway is the calibration: a biased classifier with a *measured* operating point still yields unbiased population estimates. Rogan–Gladen inversion (`p_true = (p_obs − 0.295) / 0.630`) reproduced the validation set's true prevalence exactly (0.667 vs 0.667). The practical recipe is a **hybrid** — spend frontier judgments once to build the reference standard and calibrate the open model, then let the open model run at corpus scale with its bias corrected arithmetically. That is exactly what measured v4, and what v5 is running now.
+What makes it usable anyway is the calibration: a biased classifier with a *measured* operating point still yields unbiased population estimates. Rogan–Gladen inversion (`p_true = (p_obs − 0.295) / 0.630`) reproduced the validation set's true prevalence exactly (0.667 vs 0.667). The practical recipe is a **hybrid** — spend frontier judgments once to build the reference standard and calibrate the open model, then let the open model run at corpus scale with its bias corrected arithmetically. That is exactly what measured v4 — and then produced v5, judging all 370,019 documents for the price of GPU time the program already had.
 
 ## Timeline
 
@@ -164,10 +174,12 @@ What makes it usable anyway is the calibration: a biased classifier with a *meas
 | Books fully OCR'd | 46 (5,434 pages, ~6.8M characters, ~29.5 GPU-hours) |
 | Web records scanned | 1,000,000 sample → **~70M** full crawl (112 GB parquet) |
 | Web corpus produced | **370,019 documents**, every record with an evidence trail |
-| Measured corpus precision (v4) | **0.715** [95% CI 0.679–0.749] → ~264,600 genuine records |
-| Documents individually LLM-judged | **14,653** (100% census) + 1,992 blind benchmark set |
+| Measured corpus precision | v4 **0.7211** (full census) → v5 **0.8902** [0.863–0.914] |
+| Final corpus published | **277,418** documents, ~246,959 genuinely on-topic |
+| Documents individually LLM-judged | **14,653** frontier census + **370,019** open-model census + 1,992 blind benchmark |
 | Open-model judge agreement with frontier | binary **κ 0.654**, sensitivity 0.926, `cyber` recall 0.992 |
-| Public dataset release | Hugging Face — `corpus` + `census` + `judge_benchmark` configs |
+| Strongest quality signal found | document **length** — `len(text) < 8000` alone gives 0.841 precision at zero cost |
+| Public dataset release | [Hugging Face](https://huggingface.co/datasets/Alsumaitti/arabic-cybersecurity-web) — `cyber_all` + `corpus` + `census` + `judge_benchmark` |
 
 ## Skills & infrastructure exercised
 
