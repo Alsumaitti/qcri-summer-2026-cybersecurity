@@ -146,6 +146,41 @@ Frontier judging is what makes careful curation expensive, and that cost falls h
 
 What makes it usable anyway is the calibration: a biased classifier with a *measured* operating point still yields unbiased population estimates. Rogan–Gladen inversion (`p_true = (p_obs − 0.295) / 0.630`) reproduced the validation set's true prevalence exactly (0.667 vs 0.667). The practical recipe is a **hybrid** — spend frontier judgments once to build the reference standard and calibrate the open model, then let the open model run at corpus scale with its bias corrected arithmetically. That is exactly what measured v4 — and then produced v5, judging all 370,019 documents for the price of GPU time the program already had.
 
+## Closing the loop: the census and the evidence-tiered lexicon
+
+This is the program's final movement, and it turns the pipeline into a **cycle**: the lexicon built in project 4 was measured by project 5, and the measurements flowed back to upgrade the lexicon itself.
+
+**Where it came from.** The sample evaluation exposed two specific weaknesses, each with a methodical fix:
+
+1. **A recall gap that turned out to be English, not Arabic.** Mining the records the filter *missed* showed that cybersecurity vocabulary enters Arabic writing untranslated — an Arabic author writes "VPN", not `الشبكة الافتراضية الخاصة` (VPN alone appeared in 605 missed records; then `Antivirus`, `Proxy`, `Firewall`…). This was a scope gap of the Arabic-only glossary design, fixed by **24 mined-and-verified keywords** → a combined **1,233-keyword lexicon**, and a re-filtered **v2 corpus of 14,653 records**.
+2. **A precision gap: the filter trusted every keyword equally.** One hit of `الأمن السيبراني` almost certainly means a cyber document; one hit of `حصان طروادة` is usually a political metaphor. A blind "require 2 keywords" threshold throws away the good single-hit records along with the bad.
+
+**Why a census.** Tiering keywords by their *measured* reliability needs evidence per keyword — and a 300-record sample had only observed 286 of 1,209 keywords. So every one of the **14,653** v2 records was LLM-judged (`cyber` 3,131 / `borderline` 2,550 / `not_cyber` 8,972) in a resumable in-chat campaign — 587 chunks of 25 records, commit-and-push checkpoint per chunk so the subscription's ~5-hour usage window could never cost more than one chunk, ~20 sessions / ~14 h active over 5 days, **USD 0** instead of the ~USD 100 API budget originally proposed. Being a census, the resulting proportions are *exact*, not estimates.
+
+**What it produced — the tier system.** Crossing every verdict with each record's `keywords_found` evidence measures, per keyword, how much *co-occurring evidence* it needs before a match is trustworthy:
+
+| Tier | Meaning | Keywords |
+|---|---|---|
+| 1 | Self-sufficient — one hit alone is trustworthy | 136 |
+| 2 | Needs one companion keyword | 295 |
+| 3 | Needs two companions | 57 |
+| 4 | Only trustworthy inside 4+ hits | 152 |
+| — | Never appeared in a genuinely-cyber record → measured **deletion list** | 74 |
+
+The heart of it is the **demotion rule**: a keyword whose solo matches are mostly false positives is demoted no matter how often it "works" (`VPN`: 167 good solo records vs **414** not_cyber — not Tier 1). It also settled the keyword repo's long-standing "known edge cases" with data: `حصان طروادة` solo = 10 cyber vs **163** metaphors (demoted), while `ثغرة أمنية` held Tier 1 at 49 vs 36. Every assignment has a per-keyword audit trail, published back into [arabic-cyber-keywords](https://github.com/Alsumaitti/arabic-cyber-keywords).
+
+**How it improves the findings.** The tiers drive a **tiered acceptance rule** (keep a document iff ≥ 1 Tier-1 hit, or ≥ 2 hits of tier ≤ 2, or ≥ 3 of tier ≤ 3, or ≥ 4 tiered hits) — a second-generation filter measured exactly on the census:
+
+| Rule | Kept | Lenient precision | Retention of genuine docs | F1 |
+|---|---|---|---|---|
+| accept-all (v2 corpus as-is) | 14,653 | 0.388 | 1.000 | 0.559 |
+| blind `min ≥ 2` threshold | 4,846 | 0.625 | 0.534 | 0.576 |
+| **Tiered acceptance rule** | **6,041** | **0.636** | **0.677** | **0.656** |
+
+The tiered rule **strictly dominates the blind threshold on both precision and recall** — it keeps the genuinely good single-hit documents a flat threshold discards, while suppressing the metaphorical and product-page noise. Net effect: precision lifted 0.39 → **0.64** while retaining **68%** of everything genuine, with the best F1 of any rule — and every one of those numbers is *measured over the whole population*, not extrapolated. Full write-up: [arabic-cyber-filter/evaluation/RESULTS.md](https://github.com/Alsumaitti/arabic-cyber-filter/blob/main/evaluation/RESULTS.md) · campaign log: [CAMPAIGN.md](https://github.com/Alsumaitti/arabic-cyber-filter/blob/main/evaluation/chat_judging/CAMPAIGN.md).
+
+**And it was shipped, not just measured.** The rule became a production filter and was re-run over the full **1M-record** FineWeb2 sample on the cluster (resumable 100-task `cpu-all` array), producing the final **6,041-document v3 corpus**. That run is the program's cleanest validation: reaching the answer by a completely different path — a fresh regex scan of 1M raw records rather than arithmetic over the census — it reproduced the predicted result **exactly, clause for clause** (3,253 / 2,780 / 6 / 2), and a text-hash join confirmed **zero records outside the judged census**. Because v3 is a strict subset of the judged corpus, it ships **with an LLM verdict on every record** (2,398 `cyber` · 1,446 `borderline` · 2,197 `not_cyber`) — a labelled corpus, not just a filtered one.
+
 ## Timeline
 
 | When | Milestone |
